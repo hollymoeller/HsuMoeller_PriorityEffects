@@ -1,0 +1,1187 @@
+---
+title: "MetMut_v1"
+author: "Veronica Hsu and Holly V. Moeller"
+date: "9/2/2020"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Introduction
+1) Priority effects metrics. 
+2) Time series graphs. 
+3) Max population and growth rate comparisons. 
+4) Chlorophyll-a density plots. 
+
+```{r}
+library(readr)
+df_og <- read_csv(("MetMut.csv"), 
+  col_types = cols(
+    Treatment = col_character(),
+    Species = col_character(),
+    Light_Level = col_character(),
+    Replicate = col_character(), 
+    Experimental_Day = col_double(),
+    Cells = col_double(),
+    Growth_Rate = col_double(),
+    Priority_effects = col_double()
+  )
+)
+```
+
+```{r}
+#install packages if not already
+library(readr)
+library(dplyr)
+library(plyr)
+library(tidyr)
+library(forcats)
+library("ggpubr")
+library("cowplot")
+library(scales)
+library("gridExtra")
+library(Rmisc)
+library(ggplot2)
+```
+
+##1) Priority Effects Metric
+
+Conduct a Tukey Test to see if the P-values are significantly different from 0. 
+```{r}
+df1<-df_og[!(df_og$Treatment=="media"),]
+p_c <- df1 %>% filter(`Species` == "Colp")
+p_p <- df1 %>% filter(`Species` == "P bur")
+# Compute the analysis of variance
+res.aov_c <- aov(`Priority_effects` ~ `Light_Level`, data = p_c)
+res.aov_p <- aov(`Priority_effects` ~ `Light_Level`, data = p_p)
+res.aov <- aov(`Priority_effects` ~ `Light_Level`*`Treatment`, data = df1)
+
+# Summary of the analysis
+summary(res.aov_c)
+summary(res.aov_p)
+summary(res.aov)
+
+TukeyHSD(res.aov_p)
+TukeyHSD(res.aov_c)
+TukeyHSD(res.aov)
+```
+Make boxplots of the P-values. 
+```{r}
+##Boxplot, and conduct one-sample wilcoxon test to test signif from 0
+df.colp <- df1 %>% filter(Species == "Colp")
+df.pbur <- df1 %>% filter(Species == "P bur")
+
+df.colp.1 <- df1 %>% filter(Species == "Colp", Light_Level == "0")
+df.colp.2 <- df1 %>% filter(Species == "Colp", Light_Level == "50")
+df.colp.3 <- df1 %>% filter(Species == "Colp", Light_Level == "100")
+df.colp.4 <- df1 %>% filter(Species == "Colp", Light_Level == "200")
+df.pbur.1 <- df1 %>% filter(Species == "P bur", Light_Level == "0")
+df.pbur.2 <- df1 %>% filter(Species == "P bur", Light_Level == "50")
+df.pbur.3 <- df1 %>% filter(Species == "P bur", Light_Level == "100")
+df.pbur.4 <- df1 %>% filter(Species == "P bur", Light_Level == "200")
+
+t.colp <- t.test(df.colp$`Priority_effects`, mu=0) #t-test for colpidium
+colp.1 <- t.test(df.colp.1$`Priority_effects`, mu=0)
+colp.2 <- t.test(df.colp.2$`Priority_effects`, mu=0)
+colp.3 <- t.test(df.colp.3$`Priority_effects`, mu=0)
+colp.4 <- t.test(df.colp.4$`Priority_effects`, mu=0)
+
+t.pbur <- t.test(df.pbur$`Priority_effects`, mu=0)#t-test for pbur
+pbur.1 <- t.test(df.pbur.1$`Priority_effects`, mu=0)
+pbur.2 <- t.test(df.pbur.2$`Priority_effects`, mu=0)
+pbur.3 <- t.test(df.pbur.3$`Priority_effects`, mu=0)
+pbur.4 <- t.test(df.pbur.4$`Priority_effects`, mu=0)
+
+colp.1$p.value
+colp.2$p.value
+colp.3$p.value
+colp.4$p.value
+pbur.1$p.value
+pbur.2$p.value
+pbur.3$p.value
+pbur.4$p.value
+t.colp$p.value
+t.pbur$p.value
+```
+
+```{r}
+y=10 # plot title size
+t=8 # 
+l=10 #legend text size
+x=12
+greyscale=c('black', "#666666", "#999999","#CCCCCC")
+coral = c('coral4', 'coral3', 'coral1', 'coral')
+indianred = c('indianred4','indianred3','indianred2','indianred1')
+salmon = c('lightsalmon4','lightsalmon3','lightsalmon1','peachpuff')
+customc = c('coral4','coral1','peachpuff','papayawhip')
+green = c('darkgreen','olivedrab','yellowgreen','darkolivegreen2')
+pccolors=c('lightsalmon1','olivedrab')
+lightcolors=c('darkgreen', 'coral4')
+pcolors=green
+ccolors=salmon
+
+```
+
+```{r}
+# Open a pdf file
+# pdf("fig1", width=8, height=5)
+
+labels.up <- c("a","a", "b"," ","b"," ","a"," ")
+labels_sup <- c("*", " ", "**", " ", "***", " ", " ", " ")
+labels.down <- c(" "," ", " ","c"," ","c"," ","c")
+labels_sdown <- c(" ", " "," ", "**", " ", "**", " ", "**")
+
+df2<- df_og[c(1549:1560,1608:1619),]
+
+df.ana <- summarySE(df2, measurevar="Priority_effects", groupvars = c("Light_Level", "Species"))
+df.ana$`Light_Level` = factor(df.ana$`Light_Level`, labels = c("0", "100", "200", "50"))
+df.ana= mutate(df.ana, `Light_Level`=fct_relevel(`Light_Level`,"0","50", "100", "200"))
+
+df.ana$`Species` = factor(df.ana$`Species`, labels = c("Colpidium","P. bursaria"))
+df.ana= mutate(df.ana, `Species`=fct_relevel(`Species`,"P. bursaria", "Colpidium"))
+
+df1$`Species` = factor(df1$`Species`, labels = c("Colpidium","P. bursaria"))
+df1= mutate(df1, `Species`=fct_relevel(`Species`,"P. bursaria", "Colpidium"))
+
+Pv2 <- ggplot(df.ana, aes(x = Species, y = `Priority_effects`, fill=`Light_Level`))+
+  geom_col(position="dodge")+
+  scale_fill_manual(values=ccolors)+
+  geom_errorbar(aes(ymin=`Priority_effects`-se, ymax=`Priority_effects`+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9), color='black')+  #add axis and title names
+  theme_bw()+
+  theme(legend.text=element_text(size=12, face='italic'),
+        legend.key.size = unit(0.7, 'lines'),
+        legend.background=element_rect(colour=NA, fill=NA),
+        legend.position = c(0.73, 0.15),
+        legend.title= element_text(size=10),
+        # legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+        legend.margin=margin(c(-5,1,1,1)),
+        axis.line = element_blank(),
+        # panel.grid.major = element_blank(),
+        # panel.grid.minor = element_blank(),
+        panel.border = element_rect(colour="grey"),
+        plot.tag.position = c(0.01,0.97),
+        plot.tag = element_text(size=15),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_text(size = 10),
+        axis.text.x = element_text(size = 12),
+        axis.title = element_blank())+
+  scale_y_continuous(limits = c(-2.31,1.6))+
+  scale_x_discrete(labels=c("P. bursaria", "Colpidium"))+
+  labs(tag ='B',
+       fill = expression("Light level \n(μmol quanta m"^-2*"s"^-1*")"))+
+  geom_text(aes(label = labels.up, y = `Priority_effects`+se), position = position_dodge(0.9), vjust = -.3, size=4)+
+  geom_text(aes(label = labels.down, y = `Priority_effects`- se-.17), position = position_dodge(0.9), vjust = -.3, size=4)+
+  geom_text(aes(label = labels_sup, y = `Priority_effects`+se+.05), position = position_dodge(0.9), vjust = -.3, size=6)+
+  geom_text(aes(label = labels_sdown, y = `Priority_effects`-se-.41), position = position_dodge(0.9), vjust = -.3, size=6)
+
+
+Pv1 <- ggplot(df1, aes(x=Species, y=`Priority_effects`)) +
+  geom_boxplot(aes(Species, color=Species), position="dodge", alpha=0.2, width=0.2) +
+  geom_jitter(shape=16, position=position_jitter(0.05), size = 2, aes(colour=Species)) +
+  scale_colour_manual(values=c('olivedrab','lightsalmon1'))+
+  annotate("text", x = c(1.02,2.02), y = c(max(df.colp$`Priority_effects`)-0.5,min(df.pbur$`Priority_effects`)+0.5), label = c("***","**"), size=8)+
+  theme_bw()+
+  theme(plot.tag.position = c(0.01,0.97),
+    panel.border = element_rect(colour="grey"),
+    plot.tag = element_text(size=15),
+    legend.position=("none"),
+    axis.title = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 12)) +
+  scale_y_continuous(limits = c(-2.31,1.6))+
+  scale_x_discrete(labels=c("P. bursaria", "Colpidium")) +
+  labs(tag="A")
+
+
+p_value<- ggdraw() +
+  draw_plot(Pv1, 0, 0, .5, .9) +
+  draw_plot(Pv2, .5, 0, .5, .9)
+
+annotate_figure(p_value,
+                left = text_grob("Strength of priority effects ", size=12, rot = 90))
+# Close the pdf file
+# dev.off()
+```
+
+
+##2) Time Series Graphs
+```{r}
+#Create new data frames for each treatment and light level, 20 plots
+library(dplyr)
+library(ggplot2)
+library(Rmisc)
+library("gridExtra")
+library("cowplot")
+library(forcats)
+df <- df_og
+
+df= mutate(df, Species=fct_relevel(Species,"P bur","Colp"))
+
+df.fig4_1 <- df %>% filter(Light_Level == "0", Treatment=="CP") #CP 0μE 
+df.fig4_2 <- df %>% filter(Light_Level == "50", Treatment=="CP")
+df.fig4_3 <- df %>% filter(Light_Level == "100", Treatment=="CP")
+df.fig4_4 <- df %>% filter(Light_Level == "200", Treatment=="CP")
+
+df.fig5_1 <- df %>% filter(Light_Level == "0", Treatment=="PC") #PC 0μE 
+df.fig5_2 <- df %>% filter(Light_Level == "50", Treatment=="PC")
+df.fig5_3 <- df %>% filter(Light_Level == "100", Treatment=="PC")
+df.fig5_4 <- df %>% filter(Light_Level == "200", Treatment=="PC")
+
+
+#Create df for summary SE
+
+df.fig4_1_ana <- summarySE(df.fig4_1, measurevar="Cells", groupvars=c("Species","Experimental_Day")) #CP
+df.fig4_2_ana <- summarySE(df.fig4_2, measurevar="Cells", groupvars=c("Species","Experimental_Day")) 
+df.fig4_3_ana <- summarySE(df.fig4_3, measurevar="Cells", groupvars=c("Species","Experimental_Day"))
+df.fig4_4_ana <- summarySE(df.fig4_4, measurevar="Cells", groupvars=c("Species","Experimental_Day"))
+
+df.fig5_1_ana <- summarySE(df.fig5_1, measurevar="Cells", groupvars=c("Species","Experimental_Day")) #PC
+df.fig5_2_ana <- summarySE(df.fig5_2, measurevar="Cells", groupvars=c("Species","Experimental_Day")) 
+df.fig5_3_ana <- summarySE(df.fig5_3, measurevar="Cells", groupvars=c("Species","Experimental_Day"))
+df.fig5_4_ana <- summarySE(df.fig5_4, measurevar="Cells", groupvars=c("Species","Experimental_Day"))
+```
+
+
+Population dynamics of priority effect experiments, both P. bur-first and Colp-first treatments. 
+```{r}
+title=c(10,-1,-1,10) #title position for panels
+legend=c(0.7,0.3)
+limx=c(0,40)
+limy=c(1,7500) #limits of y axis
+lines2 = c("solid", "solid")
+colors2 = c('black','gray') # CP treatments
+colors3 = c('black','gray') # PE treatments 
+
+p.fig4_1<- ggplot(df.fig4_1, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.x=element_blank(), #x axis blank
+    axis.title.y=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title),hjust=(0.5)),
+    legend.position=("none"))+ 
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40, 60), labels = c(0, 20, 40,60), expand = c(0, 0)) +
+  geom_point (data = df.fig4_1_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors2)+
+  geom_line(data = df.fig4_1_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig4_1_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("0μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="A")
+
+p.fig4_2<- ggplot(df.fig4_2, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #take out x and y axes
+    axis.title.x=element_blank(),
+    axis.title=element_text(size=x),
+    axis.ticks = element_blank(),
+    legend.text=element_text(size=l, face='italic'),
+    legend.key.size = unit(0.7, 'lines'),
+    legend.background=element_rect(colour=NA, fill=NA),
+    legend.position = c(0.36,0.12),
+    legend.title=element_blank(),
+    legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+    legend.margin=margin(c(-5,1,1,1)),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title),hjust=(0.5))) +
+  scale_x_discrete(limit=c('Colp', 'P bur'))+
+ scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)), 
+                    expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40,60), labels = c(0, 20, 40,60), expand = c(0, 0)) +
+  geom_point (data = df.fig4_2_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2,breaks=c('P bur', 'Colp'), labels=c('P. bursaria', 'Colpidium'))+
+  scale_color_manual(values=colors2,breaks=c('P bur', 'Colp'), labels=c('P. bursaria', 'Colpidium'))+
+  guides(color = guide_legend(reverse=TRUE), linetype = guide_legend(reverse=TRUE))+
+  geom_line(data = df.fig4_2_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig4_2_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("50μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="B")
+
+p.fig4_3<- ggplot(df.fig4_3, aes(x=Experimental_Day, y=Cells, group= Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    legend.title=element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40,60), labels = c(0, 20, 40,60), expand = c(0, 0)) +
+  geom_point (data = df.fig4_3_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph using analysis data frame with the averages
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors2)+
+  geom_line(data = df.fig4_3_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig4_3_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("100μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="C")
+
+p.fig4_4<- ggplot(df.fig4_4, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40,60), labels = c(0, 20, 40,60), expand = c(0, 0)) +
+  geom_point (data = df.fig4_4_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors2)+
+  geom_line(data = df.fig4_4_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig4_4_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("200μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='D')
+
+
+p.fig5_1<- ggplot(df.fig5_1, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.x=element_blank(), #x axis blank
+    axis.title.y=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title),hjust=(0.5)),
+    legend.position=("none"))+ 
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40,60), labels = c(0, 20, 40,60), expand = c(0, 0)) +
+  geom_point (data = df.fig5_1_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors3)+
+  geom_line(data = df.fig5_1_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig5_1_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("0μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="E")
+
+p.fig5_2<- ggplot(df.fig5_2, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #take out x and y axes
+    axis.title.x=element_blank(),
+    axis.title=element_text(size=x),
+    axis.ticks = element_blank(),
+    legend.text=element_text(size=l, face='italic'),
+    legend.key.size = unit(0.7, 'lines'),
+    legend.background=element_rect(colour=NA, fill=NA),
+    legend.position = c(0.36,0.12),
+    legend.title=element_blank(),
+    legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+    legend.margin=margin(c(-5,1,1,1)),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title),hjust=(0.5))) +
+  scale_x_discrete(limit=c('Colp', 'P bur'))+
+ scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)), 
+                    expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40, 60), labels = c(0, 20, 40, 60), expand = c(0, 0)) +
+  geom_point (data = df.fig5_2_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2,breaks=c('P bur', 'Colp'), labels=c('P. bursaria', 'Colpidium'))+
+  scale_color_manual(values=colors3,breaks=c('P bur', 'Colp'), labels=c('P. bursaria', 'Colpidium'))+
+  guides(color = guide_legend(reverse=TRUE), linetype = guide_legend(reverse=TRUE))+
+  geom_line(data = df.fig5_2_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig5_2_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(title = expression("50μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="F")
+
+p.fig5_3<- ggplot(df.fig5_3, aes(x=Experimental_Day, y=Cells, group= Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(color="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    legend.title=element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40, 60), labels = c(0, 20, 40, 60), expand = c(0, 0)) +
+  geom_point (data = df.fig5_3_ana, position=position_dodge(0.9), aes(color=Species)) + #now overlay the graph using analysis data frame with the averages
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors3)+
+  geom_line(data = df.fig5_3_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig5_3_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(
+    title = expression("100μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag="G")
+
+p.fig5_4<- ggplot(df.fig5_4, aes(x=Experimental_Day, y=Cells, group=Species)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,60), breaks=c(0, 20, 40, 60), labels = c(0, 20, 40, 60), expand = c(0, 0)) +
+  geom_point (data = df.fig5_4_ana, position=position_dodge(), aes(color=Species)) + #now overlay the graph
+  scale_linetype_manual(values=lines2)+
+  scale_color_manual(values=colors3)+
+  geom_line(data = df.fig5_4_ana, position=position_dodge(0.9), aes(linetype=Species, color=Species)) +
+  geom_errorbar(data = df.fig5_4_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Species)) +
+  labs(
+    title = expression("200μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='H')
+
+p.fig1<- ggdraw() +
+  draw_plot(p.fig5_1, 0, 0, .25, .5) +
+  draw_plot(p.fig5_3, .5, 0, .25, .5) +
+  draw_plot(p.fig5_4, .75, 0, .25, .5) +
+  draw_plot(p.fig5_2, .25, 0, .25, .5) +
+  draw_plot(p.fig4_1, 0, .5, .25, .5) +
+  draw_plot(p.fig4_3, .5, .5, .25, .5) +
+  draw_plot(p.fig4_4, .75, .5, .25, .5) +
+  draw_plot(p.fig4_2, .25, .5, .25, .5)
+  # draw_plot_label(label = c("P. bursaria", "Colpidium"), size = y, x=c(0,0), y=c(1,0.5))
+
+# jpeg("figS1", 575, 375)
+annotate_figure(p.fig1,
+                bottom = text_grob("Time (days)", size=10), 
+                left = text_grob("Population (cells/mL)", size=10, rot = 90)) 
+# dev.off()
+```
+
+```{r}
+limy=c(1,7000) #limits of y axis
+lines = c("dotted", "solid", "solid")
+shapes = c(0, 19, 19)
+colorsp = c("gray", "darkgreen", "yellowgreen")
+colorsc = c("gray", "lightsalmon4", "lightsalmon1")
+df$Experimental_Day <- ifelse (df$Species == 'P bur' & df$Treatment == 'CP', df$Experimental_Day -6, df$Experimental_Day) #use ifelse statement to change experimental day to D0 for P bur CP
+df$`Experimental_Day` <- ifelse (df$Species == 'Colp' & df$Treatment == 'PC', df$Experimental_Day -14, df$Experimental_Day) #use ifelse statement to change experimental day to D0 for Colp PC
+
+df.S3P_1 <- df %>% filter(Species == "P bur", Light_Level=="0") #P bur
+df.S3P_1= mutate(df.S3P_1, Treatment=fct_relevel(Treatment,"P bur","Comp", "CP", "PC"))
+df.S3P_2 <- df %>% filter(Species == "P bur", Light_Level=="50")
+df.S3P_2= mutate(df.S3P_2, Treatment=fct_relevel(Treatment,"P bur","Comp", "CP", "PC"))
+df.S3P_3 <- df %>% filter(Species == "P bur", Light_Level=="100")
+df.S3P_3= mutate(df.S3P_3, Treatment=fct_relevel(Treatment,"P bur","Comp", "CP", "PC"))
+df.S3P_4 <- df %>% filter(Species == "P bur", Light_Level=="200")
+df.S3P_4= mutate(df.S3P_4, Treatment=fct_relevel(Treatment,"P bur","Comp", "CP", "PC"))
+
+df.S3C_1 <- df %>% filter(Species == "Colp", Light_Level=="0") #Colp
+df.S3C_2 <- df %>% filter(Species == "Colp", Light_Level=="50")
+df.S3C_3 <- df %>% filter(Species == "Colp", Light_Level=="100")
+df.S3C_4 <- df %>% filter(Species == "Colp",Light_Level=="200")
+
+df.S3P_1 <- df.S3P_1 %>% filter(Treatment %in% c("P bur", "CP", "PC"))
+df.S3P_2 <- df.S3P_2 %>% filter(Treatment %in% c("P bur", "CP", "PC"))
+df.S3P_3 <- df.S3P_3 %>% filter(Treatment %in% c("P bur", "CP", "PC"))
+df.S3P_4 <- df.S3P_4 %>% filter(Treatment %in% c("P bur", "CP", "PC"))
+
+df.S3C_1 <- df.S3C_1 %>% filter(Treatment %in% c("Colp", "CP", "PC"))
+df.S3C_2 <- df.S3C_2 %>% filter(Treatment %in% c("Colp", "CP", "PC"))
+df.S3C_3 <- df.S3C_3 %>% filter(Treatment %in% c("Colp", "CP", "PC"))
+df.S3C_4 <- df.S3C_4 %>% filter(Treatment %in% c("Colp", "CP", "PC"))
+
+#Create df for summary SE
+df.S3P_1_ana <- summarySE(df.S3P_1, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment")) #P bur
+df.S3P_2_ana <- summarySE(df.S3P_2, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment")) 
+df.S3P_3_ana <- summarySE(df.S3P_3, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment"))
+df.S3P_4_ana <- summarySE(df.S3P_4, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment"))
+
+df.S3C_1_ana <- summarySE(df.S3C_1, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment")) #Colp
+df.S3C_2_ana <- summarySE(df.S3C_2, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment")) 
+df.S3C_3_ana <- summarySE(df.S3C_3, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment"))
+df.S3C_4_ana <- summarySE(df.S3C_4, measurevar="Cells", groupvars=c("Experimental_Day", "Treatment"))
+
+p.S3P_1<- ggplot(df.S3P_1, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    legend.position="none",
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)))+
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3P_1_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsp)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3P_1_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3P_1_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("0μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='A')
+
+p.S3P_2<- ggplot(df.S3P_2, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.text=element_text(size=l, face='italic'),
+    legend.key.size = unit(0.7, 'lines'),
+    legend.background=element_rect(colour=NA, fill=NA),
+    legend.position = c(0.33,0.17),
+    legend.title=element_blank(),
+    legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+    legend.margin=margin(c(-5,1,1,1)))+
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3P_2_ana, position=position_dodge(.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines, breaks=c('P bur', 'CP', 'PC'), labels=c('Control', 'Colp first', 'P bur first'))+
+  scale_color_manual(values=colorsp, breaks=c('P bur', 'CP','PC'), labels=c('Control', 'Colp first','P bur first'))+
+  scale_shape_manual(values=shapes, breaks=c('P bur', 'CP', 'PC'), labels=c('Control', 'Colp first', 'P bur first'))+
+  geom_line(data = df.S3P_2_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3P_2_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("50μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='B')
+
+p.S3P_3<- ggplot(df.S3P_3, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3P_3_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsp)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3P_3_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3P_3_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("100μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='C')
+
+p.S3P_4<- ggplot(df.S3P_4, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3P_4_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsp)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3P_4_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3P_4_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("200μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='D')
+
+p.S3C_1<- ggplot(df.S3C_1, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    legend.position="none",
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)))+
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3C_1_ana, position=position_dodge(0.9), aes(color=Treatment,shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsc)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3C_1_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3C_1_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("0μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='E')
+
+p.S3C_2<- ggplot(df.S3C_2, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.text=element_text(size=l, face='italic'),
+    legend.key.size = unit(0.7, 'lines'),
+    legend.background=element_rect(colour=NA, fill=NA),
+    legend.position = c(0.33,0.17),
+    legend.title=element_blank(),
+    legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+    legend.margin=margin(c(-5,1,1,1)))+
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3C_2_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines, breaks=c('Colp', 'CP', 'PC'), labels=c('Control', 'Colp first', 'P bur first'))+
+  scale_color_manual(values=colorsc, breaks=c('Colp', 'CP','PC'), labels=c('Control', 'Colp first','P bur first'))+
+  scale_shape_manual(values=shapes, breaks=c('Colp', 'CP', 'PC'), labels=c('Control', 'Colp first', 'P bur first'))+
+  geom_line(data = df.S3C_2_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3C_2_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("50μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='F')
+
+p.S3C_3<- ggplot(df.S3C_3, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3C_3_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsc)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3C_3_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3C_3_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("100μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='G')
+
+p.S3C_4<- ggplot(df.S3C_4, aes(x=Experimental_Day, y=Cells, group=Treatment)) +
+  theme_bw()+
+  theme(axis.line = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(colour="grey"),
+    panel.background = element_blank(),
+    axis.text=element_text(size=t),
+    axis.title.y=element_blank(), #x axis blank
+    axis.title=element_blank(),
+    axis.ticks = element_blank(),
+    plot.tag.position = c(0.05,0.85),
+    plot.tag = element_text(size=12),
+    plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+    legend.position=("none"))+ #take out legend for now
+  scale_y_continuous(trans=log10_trans(), 
+                     limits=limy, 
+                     breaks= trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)),
+                     expand = c(0, 0)) + 
+  scale_x_continuous(limits=limx, breaks=c(0, 20, 40), labels = c(0, 20, 40), expand = c(0, 0)) +
+  geom_point (data = df.S3C_4_ana, position=position_dodge(0.9), aes(color=Treatment, shape=Treatment)) + #now overlay the graph
+  scale_linetype_manual(values=lines)+
+  scale_color_manual(values=colorsc)+
+  scale_shape_manual(values=shapes)+
+  geom_line(data = df.S3C_4_ana, position=position_dodge(0.9), aes(linetype=Treatment, color=Treatment)) +
+  geom_errorbar(data = df.S3C_4_ana, aes(ymin=Cells-se, ymax=Cells+se, color=Treatment)) +
+  labs(title = expression("200μmol quanta m"^-2*"s"^-1),
+       x="Time (days)",
+       y="Cells",
+       tag ='H')
+
+p.S3<- ggdraw() +
+  draw_plot(p.S3C_1, 0, 0, .25, .5) +
+  draw_plot(p.S3C_3, .5, 0, .25, .5) +
+  draw_plot(p.S3C_4, .75, 0, .25, .5) +
+  draw_plot(p.S3C_2, .25, 0, .25, .5) +
+  draw_plot(p.S3P_1, 0, .53, .25, .5) +
+  draw_plot(p.S3P_3, .5, .53, .25, .5) +
+  draw_plot(p.S3P_4, .75, .53, .25, .5) +
+  draw_plot(p.S3P_2, .25, .53, .25, .5) 
+  # draw_plot_label(label = c("P. bursaria", "Colpidium"), size = y, x=c(0,0), y=c(1,0.5))
+
+annotate_figure(p.S3,
+                bottom = text_grob("Time (days)", size=10), 
+                left = text_grob("Population (cells/mL)", size=10, rot = 90)) 
+```
+
+
+##3) Max pop and growth rate comparisons for single-cell and priority effect treatments
+```{r}
+m_p <- df_og %>% filter(Species=="P bur", Treatment %in% c("P bur_v", "CP_v", "PC_v"))
+m_c <- df_og %>% filter(Species=="Colp", Treatment %in% c("Colp_v", "CP_v", "PC_v"))
+
+m_p$Treatment <- as.character(m_p$Treatment)
+m_c$Treatment <- as.character(m_c$Treatment)
+
+m_pana<- summarySE(m_p, measurevar="Cells", groupvars=c("Treatment","Light_Level")) #create analysis df 
+m_pana$Treatment = factor(m_pana$Treatment, labels = c("Colp-first", "Control", "P bur-first"))
+m_pana= mutate(m_pana, Treatment=fct_relevel(Treatment,"Control","P bur-first", "Colp-first"))
+m_pana$Light_Level = factor(m_pana$Light_Level, labels = c("0", "100", "200", "50"))
+m_pana= mutate(m_pana, Light_Level=fct_relevel(Light_Level,"0","50", "100", "200"))
+
+names(m_c)<- c("Treatment", "Species", "Light_Level", "Replicate", "Experimental_Day", "Cells", "Growth_Rate")
+m_cana<- summarySE(m_c, measurevar="Cells", groupvars=c("Light_Level", "Treatment")) #create analysis df 
+
+m_cana$Treatment = factor(m_cana$Treatment, labels = c("Control", "Colp-first", "P bur-first"))
+m_cana= mutate(m_cana, Treatment=fct_relevel(Treatment,"Control","P bur-first", "Colp-first"))
+m_cana$Light_Level = factor(m_cana$Light_Level, labels = c("0", "100", "200", "50"))
+m_cana= mutate(m_cana, Light_Level=fct_relevel(Light_Level,"0","50", "100", "200"))
+
+m_pgana<- summarySE(m_p, measurevar="Growth_Rate", groupvars=c("Light_Level", "Treatment")) #create analysis df 
+m_pgana$Light_Level = factor(m_pgana$Light_Level, labels = c("0", "100", "200", "50"))
+m_pgana= mutate(m_pgana, Light_Level=fct_relevel(Light_Level,"0","50", "100", "200"))
+m_pgana$Treatment = factor(m_pgana$Treatment, labels = c("Colp-first", "Control", "P bur-first"))
+m_pgana= mutate(m_pgana, Treatment=fct_relevel(Treatment,"Control", "P bur-first", "Colp-first"))
+# change treatment labels from number to treatment description:
+# m_pgana$Treatment = factor(m_pgana$Treatment, labels = c("P bursaria single", "Competition", "Colpdium first", "Paramecium first"))
+
+m_cgana<- summarySE(m_c, measurevar="Growth_Rate", groupvars=c("Light_Level", "Treatment")) #create analysis df 
+
+m_cgana$Light_Level = factor(m_cgana$Light_Level, labels = c("0", "100", "200", "50"))
+m_cgana= mutate(m_cgana, Light_Level=fct_relevel(Light_Level,"0","50", "100", "200"))
+m_cgana$Treatment = factor(m_cgana$Treatment, labels = c("Control", "Colp-first", "P bur-first"))
+m_cgana= mutate(m_cgana, Treatment=fct_relevel(Treatment,"Control","P bur-first", "Colp-first"))
+# change treatment labels from number to treatment description:
+#m_cana$Treatment = factor(m_cana$Treatment, labels = c("Colpidium single", "Competition", "Colpdium first", "Paramecium first"))
+#m_cana = mutate(m_pana, Treatment=fct_relevel(Treatment,"Colpidium single","Competition", "Colpidium first", "Paramecium first"))
+
+```
+Graph A)
+```{r}
+labels.mp <- c("a", "a", "a", "a", "a", "b", "b", "a", "a", "a", "a", "a")
+
+p.m_p <- ggplot(m_pana, aes(x = `Treatment`, y = `Cells`, fill = `Light_Level`)) +
+  geom_col(position = "dodge")+   
+    scale_fill_manual(values=pcolors, labels = c('0','50','100','200'))+
+  geom_errorbar(aes(ymin=`Cells`-se, ymax=`Cells`+se),
+                  width=.2,                   
+                  position=position_dodge(.9),
+                show.legend=FALSE) + 
+  theme_light()+
+  scale_y_continuous(limits = c(0, 7500), expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0))+
+  theme(legend.text=element_text(size=12, face='italic'),
+        legend.key.size = unit(0.7, 'lines'),
+        legend.background=element_rect(colour=NA, fill=NA),
+        legend.position = c(0.8, 0.7),
+        legend.margin=margin(c(-5,1,1,1)),
+        legend.title = element_text(size=10), 
+        axis.line = element_blank(),
+        axis.line.y.left = element_line(color="grey"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        plot.tag.position = c(0.01,1),
+        plot.tag = element_text(size=15),
+        plot.title = element_text(size=12, margin = margin(title), hjust = (0.5)),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8, angle = 90, hjust=.5),
+        axis.title = element_blank())+
+    labs(title = "P. bursaria",
+       tag="A",
+        fill= expression("Light level \n(μmol quanta m"^-2*"s"^-1*")")) +
+    geom_text(aes(label = labels.mp, y = `Cells`+se), position = position_dodge(0.9), vjust = -.3, size=4.5)
+```
+
+Graph B)
+```{r}
+
+labels.mc <- c("a", "abc", "cd", "a", "a", "ab", "a", "a", "d", "ab", "cd", "bcd")
+p.m_c <- ggplot(m_cana, aes(x = `Treatment`, y = `Cells`, fill = `Light_Level`)) +
+  geom_col(position = "dodge")+  
+   scale_fill_manual(values=ccolors)+
+  geom_errorbar(aes(ymin=`Cells`-se, ymax=`Cells`+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9)) + #add axis and title names
+  theme_light()+
+  scale_y_continuous(limits = c(0, 8500), expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0))+
+  theme(legend.text=element_text(size=12, face='italic'),
+        legend.key.size = unit(0.7, 'lines'),
+        legend.background=element_rect(colour=NA, fill=NA),
+        legend.position = c(0.23, 0.7),
+        legend.title = element_text(size=10), 
+        # legend.box.background=element_rect(linetype = 'solid', colour = 'grey'),
+        legend.margin=margin(c(-5,1,1,1)),
+        axis.line = element_blank(),
+        axis.line.y.left= element_line(color="gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        plot.tag.position = c(0.01,1),
+        plot.tag = element_text(size=15),
+        plot.title = element_text(size=12, margin = margin(title), hjust = (0.5)),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8, angle = 90, hjust=.5),
+        axis.title = element_blank())+
+    labs(title = "Colpidium",
+       tag="B",
+       fill = expression("Light level \n(μmol quanta m"^-2*"s"^-1*")"))+
+      geom_text(aes(label = labels.mc, y = `Cells`+se), position = position_dodge(0.9), vjust = -.3, size=4.5)
+```
+
+Graph C)
+```{r}
+
+labels.gp1 <- c(NA,NA,NA,"de", "b", "bd", "de", "b", "bd", "e", "bd", "b") 
+labels.gp2 <- c("d", "a", "a", NA, NA, NA, NA,NA,NA,NA,NA,NA)
+p.m_pg <- ggplot(m_pgana, aes(x = `Treatment`, y = `Growth_Rate`, fill = `Light_Level`)) +
+  geom_col(position = "dodge")+
+   scale_fill_manual(values=pcolors)+
+  geom_errorbar(aes(ymin=`Growth_Rate`-se, ymax=`Growth_Rate`+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9)) + #add axis and title names
+   theme_light()+
+  scale_y_continuous(limits = c(-.25, .2), expand=c(0,0), breaks=c(-.15,0,.15))+
+  scale_x_discrete(expand=c(0,0))+
+  theme(legend.position = "none",
+        axis.line = element_blank(),
+        axis.line.y.left= element_line(color="gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        plot.tag.position = c(0.01,1),
+        plot.tag = element_text(size=15),
+        plot.title = element_text(size=12, margin = margin(title), hjust = (0.5)),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8, angle = 90, hjust=0.5),
+        axis.title = element_blank())+
+    labs(title = "P. bursaria",
+       tag="C")+
+    geom_text(aes(label = labels.gp1, y = `Growth_Rate`+se), position = position_dodge(0.9), vjust = -.3, size=4.5)+
+    geom_text(aes(label = labels.gp2, y = 0), position = position_dodge(0.9), vjust = -.3, size=4.5)
+```
+
+Graph D)
+```{r}
+labels.gc <- c("ab", "ab", "ab", "a", "ab", "a", "b", "ab", "a", "a", "ab", "ab")
+p.m_cg <- ggplot(m_cgana, aes(x = `Treatment`, y = `Growth_Rate`, fill = `Light_Level`)) +
+  geom_col(position = "dodge")+  
+   scale_fill_manual(values=ccolors)+
+  geom_errorbar(aes(ymin=`Growth_Rate`-se, ymax=`Growth_Rate`+se),
+                  width=.2,           
+                  position=position_dodge(.9)) + 
+   theme_light()+
+  scale_y_continuous(limits = c(0,1), expand=c(0,0), breaks=c(.3, .6, .9))+
+  scale_x_discrete(expand=c(0,0))+
+  theme(legend.position = "none",
+        axis.line = element_blank(),        
+        axis.line.y.left= element_line(color="gray"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        plot.tag.position = c(0.01,1),
+        plot.tag = element_text(size=15),
+        plot.title = element_text(size=12, margin = margin(title), hjust = (0.5)),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 8, angle=90, hjust=0.5),
+        axis.title = element_blank())+
+    labs(title = "Colpidium",
+       tag="D")+   
+    geom_text(aes(label = labels.gc, y = `Growth_Rate`+se), position = position_dodge(0.9), vjust = -.3, size=4.5)
+
+p.m<- ggdraw() +
+  draw_plot(p.m_p, 0, 0, .5, .8) +
+  draw_plot(p.m_c, .5, 0, .5, .8) 
+
+p.gr<- ggdraw() +
+  draw_plot(p.m_pg, 0, 0, .5, .8) +
+  draw_plot(p.m_cg, .5, 0, .5, .8) 
+
+
+annotate_figure(p.m,
+                left = text_grob("Maximum population (cells/mL)", size=10, rot = 90))
+annotate_figure(p.gr,
+                left = text_grob("Growth rate (cells per day)", size=10, rot = 90))
+```
+
+#Tukey test without comp 4/16/2020
+```{r}
+# Compute the analysis of variance
+m_c <- m_c[,1:7] #take out priority effects metrics 
+
+m_p2 <- m_p %>% filter(`Treatment` %in% c("P bur_v", "CP_v", "PC_v"))
+m_c2 <- m_c %>% filter(`Treatment` %in% c("Colp_v", "CP_v", "PC_v"))
+res.aov_m_p2 <- aov(`Cells` ~ `Light_Level`*Treatment, data = m_p2)
+res.aov_m_c2 <- aov(`Cells` ~ `Light_Level`*Treatment, data = m_c2)
+
+res.aov_m_pg2 <- aov(`Growth_Rate` ~ `Light_Level`*Treatment, data = m_p2)
+res.aov_m_cg2 <- aov(`Growth_Rate` ~ `Light_Level`*Treatment, data = m_c2)
+
+# Summary of the analysis
+summary(res.aov_m_p2)
+summary(res.aov_m_c2)
+summary(res.aov_m_pg2)
+summary(res.aov_m_cg2)
+
+TukeyHSD(res.aov_m_p2)
+TukeyHSD(res.aov_m_c2)
+TukeyHSD(res.aov_m_pg2)
+TukeyHSD(res.aov_m_cg2)
+```
+
+#Chlorophyll-a density plots
+```{r}
+library(ggplot2)
+library(dplyr)
+library(plyr)
+
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+df_chl <- df_og %>% filter(!is.na(Chl_a))
+df_p <- df_chl %>% filter(`Treatment` == "P bur")
+
+df_PC <- df_chl %>% filter(`Treatment`=="PC")
+df_PC$`Light_Level`<- as.character(df_PC$`Light_Level`)
+df_PCsum <- data_summary(data = df_PC, varname = 'Chl_a', groupnames = 'Light_Level' ) #create a new data frame
+df_psum <- data_summary(data = df_p, varname = 'Chl_a', groupnames = 'Light_Level' ) #create a new data frame
+df_sum <- data_summary(data = df_chl, varname = 'Chl_a', groupnames = c('Light_Level','Treatment'))
+                       
+y.sdPC <- df_PCsum$sd #gather your stdevs as a list of values
+y.sdp <- df_psum$sd
+y.sd <- df_sum$sd
+yPC <- df_PCsum$Chl_a #gather means
+yp <- df_psum$Chl_a
+y <- df_sum$Chl_a 
+
+
+# Compute the analysis of variance
+res.aovPC <- aov(`Chl_a` ~ `Light_Level`, data = df_PC)
+res.aovp <- aov(`Chl_a` ~ `Light_Level`, data = df_p)
+res.aov <- aov(`Chl_a` ~ `Light_Level`*Treatment, data = df_chl)
+
+# Summary of the analysis
+summary(res.aovPC)
+TukeyHSD(res.aovPC)
+summary(res.aovp)
+TukeyHSD(res.aovp)
+summary(res.aov)
+TukeyHSD(res.aov)
+
+df_sum$`Light_Level` = factor(df_sum$`Light_Level`, labels = c("0", "100", "200", "50", "media"))
+
+df_sum= mutate(df_sum, `Light_Level`=fct_relevel(`Light_Level`,"media","0","50", "100", "200"))
+
+df_chl$Light_Level = factor(df_chl$Light_Level, labels=c("0", "100", "200", "50", "media"))
+df_chl = mutate(df_chl, `Light_Level`=fct_relevel(`Light_Level`,"media", "0","50", "100", "200"))
+
+ggplot(df_sum, aes(x=Light_Level, y=Chl_a, fill=Treatment, colour=Treatment)) +
+  labs(title=NULL,x= "Light Level", y = "RFU") +
+  geom_col(position="dodge", aes(colour=Treatment), width=c(.9,.9,.9,.9,.9,.9,.9,.9,.45)) +
+  geom_col(position="dodge", aes(colour=Treatment, fill=NA),width=c(.9,.9,.9,.9,.9,.9,.9,.9,.45)) +
+    geom_point(data=df_chl,shape=16, position=position_jitterdodge(jitter.width=0.07, dodge.width=0.9), size = 1.5, aes(colour=Treatment)) +
+  scale_fill_discrete(limits=c("media", "P bur", "PC"))+
+  scale_color_discrete(limits=c("media", "P bur", "PC"))+
+  scale_color_manual(values=c('black','lightsalmon4','darkgreen'))+
+  scale_fill_manual(values=c( 'grey','peachpuff','olivedrab')) +
+  geom_errorbar(aes(ymin=Chl_a-sd, ymax=Chl_a+sd), width=.2, position=position_dodge(0.9))+ 
+  # scale_fill_manual(values=c("black", "black"))+
+  theme_bw()+
+  theme(legend.text=element_text(size=12, face='italic'),
+        legend.key.size = unit(1, 'lines'),
+        legend.background=element_rect(colour=NA, fill=NA),
+        legend.position = c(0.125,0.8),
+        # legend.position=("none"),
+        legend.title= element_blank(),
+        legend.margin=margin(c(-5,1,1,1)),
+        axis.line = element_blank(),
+        panel.border = element_rect(colour="grey"),
+        plot.tag.position = c(0.1,0.97),
+        plot.tag = element_text(size=15),
+        plot.title = element_text(size=y, margin = margin(title), hjust = (0.5)),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_text(size = 10),
+        axis.text.x = element_text(size = 12),
+        axis.title=element_text(size=12)) +
+    labs(title=NULL, x= expression("Light level (μmol quanta m"^-2*"s"^-1*")"), y = "Chlorophyll-a density (μg/mL)")
+
+```
+
+
+
+
